@@ -1,0 +1,137 @@
+
+set statistics time on;
+
+/* Part 1: Create an advanced join query and execute (use as many tables as you can). Show the query,
+the data results, and teh time to complete (shown in the results and messages tab); take a snapshot.
+The idea here is to create a query that will tax the computer resources - force the DBMS to use 
+its resources. Be creative here. Use clauses/keywords to create a really advanced query. */
+
+select distinct pid "employee ID number", lname "last name", fname "first name", 
+		hiredate "hire date",
+		ppp * numberinparty "total cost"
+	from personnel p join guides gu
+				on pid = gid
+		join reservations r
+				on r.gid = gu.gid
+		join guests g
+				on g.guest# = r.guest#
+		join condostays cs
+				on g.guest# = cs.guest#
+		join activities a
+				on a.aid = r.aid
+		join condos c
+				on cs.condo# = c.condo#
+			where year (startdate) = '2019'
+				and month (startdate) between '06' and '12'
+				and sqrft > 750
+				and bldg# = 'a'
+				and year (hiredate) = '2012'
+order by 5 desc, 2;
+
+
+/* Three attributes that should have secondary indexes defined are startdate and hiredate, the former of which are part of the WHERE statement, the latter
+in the ORDER BY clause. */
+
+select * from condostays;
+select * from personnel;
+
+
+
+
+
+
+
+
+
+
+create index startdateidx
+	on condostays (startdate);
+
+/* By creating a secondary index on startdate, we should decrease the time it takes for the database to query through all records in condostays
+and find those that fulfill the startdate restrictions. This field will not have NULL values. */
+
+create index hiredateidx
+	on personnel (hiredate);
+/* Similar to the first index; this should decrease the processing time for the hiredate of personnel by indexing based on an attribute found in 
+the WHERE clause. This field will not have NULL values. */
+
+create index lnameidx
+	on personnel (lname);
+/* This indexes based on last name of the employee, which is a key part of the order by statement: one of the more taxing statements in the query. 
+This field will not have NULL values. */
+
+
+/* The inclusion of the three indexes above resulted in an overall decrease in the time it took to execute the query. This is thanks to the indexes
+assissting the query in three attributes (hiredate, startdate, and lname) across two clauses (where and order by). */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+select distinct pid "employee ID number", lname "last name", fname "first name", 
+		hiredate "hire date",
+		ppp * numberinparty "total cost"
+	from personnel p join guides gu
+				on pid = gid
+		join reservations r
+				on r.gid = gu.gid
+		join guests g
+				on g.guest# = r.guest#
+		join condostays cs
+				on g.guest# = cs.guest#
+		join activities a
+				on a.aid = r.aid
+		join condos c
+				on cs.condo# = c.condo#
+			where year (startdate) = '2019'
+				and month (startdate) between '06' and '12'
+				and sqrft > 750
+				and bldg# = 'a'
+				and year (hiredate) = '2012'
+order by 5 desc, 2;
+
+select distinct pid "employee ID number", lname "employee last name", fname "first name", hiredate "hire date",
+				ppp * numberinparty "total cost"
+	from personnel p join guides gu
+				on pid = gid
+		join reservations r 
+				on r.gid = gu.gid
+		join activities a
+				on a.aid = r.aid
+			where year (hiredate) = '2012'
+				and guest# in 
+					(select guest#
+						from condostays
+							where month (startdate) between '06' and '12'
+								and year (startdate) = '2019'
+								and condo# in
+									(select condo#
+										from condos 
+											where sqrft > 750
+											and bldg# = 'a'));
+
+
+/* When executing the partially nested query, I expected the resulting time to execute to be shorter than the time to execute the original, fully joined query. Unfortunately, I got some confusing results. 
+It appears that, when executed on its own, the partially nested query took more time (CPU and Elapsed) to execute. The difference was substantial (CPU = 16ms Elapsed = 65ms vs. CPU = 32ms Elapsed = 99ms), 
+but more interesting was the in depth comparison between the execution plans and the execution times when both statements were executed in the same batch. The DBMS seems to attribute more batch cost to the 
+unoptimized fully joined query than it does the optimized partially nested query (43% vs 57%). Furthermore, it shows that the overall execution time was actually longer for the unoptimized statement than 
+the optimized one (CPU = 62ms Elapsed = 68ms vs. CPU = 16ms Elapsed = 3ms). 
+
+After taking time to research and re-review the results, it appears as if the nested query is simply incrdibly efficient in comparison to the fully joined query. Even after clearing the cache by logging in
+and out like the professor suggested, my overall query time is 2ms in length for execution, with effectively 0ms parse and compile times (shown below). This indicates to me that the efficiency of the nested 
+query is incredibly high, resulting in near 0 (but not actually 0) times. The longer times above seem to be outliers that I cannot replicate after trying several times. This fits more congruently with what we 
+learned in class: a nested statement should run more efficiently than a joined statement because it requires fewer joins, and thus fewer reads and writes. The batch statement results reinforce this conclusion; 
+when run side by side, taking more time due to the increased total calculations in the batch, the optimized query was faster than the unoptimized one. 
+
+Overall, this assignment shows that the efficiency of a query can be bolstered significantly by the inclusion of valuable secondary indexes and query optimization in the form of nesting and removing 
+order by statements when not entirely necessary. The results show a healthy decrease in parse/compile and execution times when adding indexes, and a massive decrease in parse/compile and execution
+times when optimizing the query itsself. */

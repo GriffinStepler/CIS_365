@@ -1,0 +1,109 @@
+select sname, commission "commission%"
+	from staff s join salesstaff ss
+		on staffid = salesid; 
+
+select ordid "every mountain's orders", orderdate, shipdate
+	from orders o join customers c
+		on c.custid = o.custid
+			where cname = 'every mountain';
+select ordid, orderdate, shipdate
+	from orders o, customers c
+		where o.custid = c.custid
+			and cname = 'every mountain';
+
+select p.prodid, description, qty, price, price * qty "item total"
+	from products p join items i
+		on p.prodid = i.prodid
+order by 5 desc;
+
+select sname "staff", dname "department", dslocation "state"
+	from staff s join departments d
+		on d.deptno = s.deptno;
+
+select cname, ccity, cstate, 
+	ordid, shipdate, prodid, qty
+		from customers c join orders o
+				on c.custid = o.custid
+			join items i
+				on i.ordid = o.ordid
+order by 1, 4;
+
+select sname "staff", dname "department", mthsalary "salary"
+	from staff s join departments d
+		on d.deptno = s.deptno
+			where mthsalary > 3000
+order by 3 desc;
+
+select sname "staff", commission, salesid
+	from staff s left join salesstaff ss
+		on staffid = salesid
+			where year (hiredate) > '2014'
+order by 2;
+
+select sname, cname
+	from staff left join customers
+			on staffid = repid
+		where cname is null
+order by 1;
+
+select p.prodid, description, price, ordid
+	from items i right join products p
+			on p.prodid = i.prodid
+		where price < 100
+order by 3 desc;
+
+select cname, count (ordid) "orders per customer"
+	from orders o join customers c
+			on o.custid = c.custid
+	group by cname
+		having count (ordid) > 2
+order by 2 desc;
+
+select dname, dclocation "city", dslocation "state", 
+		count (staffid) "number of staff"
+	from departments d join staff s
+		on d.deptno = s.deptno
+	group by dname, dclocation, dslocation
+order by 4 desc;
+
+select dname, dslocation "state", count (staffid) "number of staff"
+	from departments d join staff s
+		on d.deptno = s.deptno
+	where dslocation in ('tx', 'co', 'ny', 'ks', 'ma', 'ca')
+		group by dname, dslocation
+order by 2;
+
+select c.custid, cname, careacode, cphone,
+		count (qty) "total items purchased", avg (qty * price) "average $ spent"
+	from customers c join orders o
+			on c.custid = o.custid
+		join items i
+			on i.ordid = o.ordid
+		join products p
+			on p.prodid = i.prodid
+		group by c.custid, cname, careacode, cphone
+			having count (qty) > 5
+order by 5 desc;
+
+select sname, jobtitle
+	from staff
+		where deptno in
+			(select deptno
+				from staff
+					where sname = 'jones');
+
+select distinct sname "sold products between $20 and $50)
+from staff
+where staffid in
+	(select repid
+	from customers
+	where custid in
+		(select custid 
+		from orders
+		where ordid in
+			(select ordid
+			from items
+			where prodid in
+				(select prodid
+				from products
+				where price between 20 and 50))));

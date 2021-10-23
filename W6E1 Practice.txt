@@ -1,0 +1,212 @@
+create view mega_query as
+	select sname sname "staff", deptno ""kinley's department", mthsalary "salaries > $2100", commission "kelly's commission"
+		from staff s join salesstaff ss
+			on staffid = salesid
+	where deptno in
+		(select deptno
+		from staff
+		where staffid in
+			(select staffid
+			from staff
+			where sname = 'kinley'))
+		and commission in
+			(select commission
+			from salesstaff
+			where salesid in
+				(select staffid
+				from staff
+				where sname = 'kelly'))
+		and mthsalary > 2100
+		and sname not in ('kinley', 'kelly');
+	
+	select *
+		from mega_query
+	order by 1;
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+begin transaction;
+
+insert into orders
+	values (630, getdate(), 130, getdate() + 1);
+select *
+	from orders
+		where ordid = 630;
+
+insert into products
+	values (700500, 'foster stroke of genius r7 deck skateboard', 44.95);
+select * 
+	from products 
+		where prodid = 700500;
+
+insert into items 
+	values (630, 700500, 10);
+select * 
+	from items
+		where ordid - 630
+			and prodid = 700500;
+
+rollback;
+commit;
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+create table iteminsertlog (
+	lognumber int identity (1,1) primary key,
+	logtime	datetime default getdate(),
+	ordid char(4),
+	prodid int,
+	description varchar(50),
+	qty int,
+	price decimal(5,2));
+
+select * from iteminsertlog;
+	
+
+
+create trigger insertlogtrig
+on items
+after insert
+as
+insert into iteminsertlog (ordid, prodid, description, qty, price)
+	values (
+		(select ordid 
+			from inserted),
+		(select prodid 
+			from inserted),
+		(select description 
+			from products
+				where prodid in
+					(select prodid
+						from inserted)
+		(select qty
+			from inserted),
+		(select price
+			from products
+				where prodid in
+					(select prodid
+						from inserted)));
+
+begin transaction;
+
+insert into items
+	values ('614', 100890, 1);
+
+select *
+	from itemsinsertlog;
+
+rollback;
+commit;
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+create table monthendreport (
+	customer	varchar(45),
+	salesRep	varchar(50),
+	order#		char(4)		primary key,
+	orderDate	date,
+	product#	int		primary key,
+	description	varchar(50),
+	qtyPurchased	int,
+	salesPrice	decimal(5,2));
+
+select * 
+	from monthendreport;
+
+
+
+
+create procedure ProcessMonthEndReport as
+
+begin
+insert into monthendreport
+	select cname, sname, o.ordid, orderdate, i.prodid,
+			description, qty, price
+		from staff s join customers c
+				on staffid = repid
+			join orders o
+				on o.custid = c.custid
+			join items i
+				on o.ordid = i.ordid
+			join products p
+				on i.prodid = p.prodid
+		where month (orderdate) = '02'
+			and year (orderdate) = '2012';
+
+select *
+	from monthendreport;
+
+end
+
+
+
+
+exec processmonthendreport;
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+create table salesReceipt (
+	invoice#	identity (1,1)	primary key,
+	invoicedate	date		default getdate(),
+	custid		char(3),
+	cname		varchar(45),
+	ordid		char(4),
+	prodid		int,
+	description	varchar(50),
+	qtypurchased	int,
+	qtybilled	int,
+	reason		varchar(50),
+	price		decimal(5,2),
+	ordertotal	decimal(6,2));
+
+create trigger billing
+on items
+after update
+as 
+insert into salesReceipt (custid, cname, ordid, prodid, description, qtypurchased, qtybilled, reason, price, ordertotal)
+	values (
+		(select custid
+		from orders
+		where ordid in
+			(select ordid
+			from inserted)),
+		'Sportsmania', 
+		(select ordid
+		from inserted),
+		(select prodid
+		from deleted),
+		(select description
+		from products
+		where prodid in
+			(select prodid
+			from inserted)),
+		(select qty
+		from deleted),
+		(select qty
+		from inserted),
+		'damaged / missing wheels',
+		(select price
+		from products
+		where prodid in
+			(select prodid
+			from inserted)),
+		(select qty * price
+		from products p join inserted i
+		on p.prodid = i.prodid));
+
+select *
+	from salesreceipt;
+
+select * 
+	from items
+		where prodid = '700500';
+
+
+begin transaction;
+
+update items
+	set qty = qty - 3
+		where prodid = '700500';
+
+rollback;
+commit;

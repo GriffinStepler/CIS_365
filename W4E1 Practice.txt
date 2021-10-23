@@ -1,0 +1,80 @@
+select sname, hiredate, deptno
+	from staff;
+
+select cname, ccity
+	from customers
+		where cstate = 'california'
+			order by 2;
+
+seelct cname, careacode, cphone, ccreditlimit
+	from customers
+		where ccreditlimit > 7000;
+
+select description
+	from products
+		where price between 100 and 150;
+
+update staff
+	set jobtitle = sales
+		where sname = 'james'
+			and jobtitle != 'sales';
+
+update staff
+	set mthsalary = mthsalary * 1.05,
+		hiredate = '12-05-2009'
+			where sname = 'prince';
+
+select sum (mthsalary) "total monthly salaries"
+	from staff;
+
+select dname "ny and tx departments"
+	from departments
+		where dslocation = 'ny'
+			or dslocation = 'tx';
+
+select cname "credit limits under $8000", cstate 
+	from customers 
+		where cstate in ('ca', 'az')
+			and ccreditlimit < 8000;
+
+select max (price) "highest priced product at the sports shop"
+	from products;
+
+select * 
+	from staff
+		where sname = 'smith';
+select * 
+	from salesstaff
+		where salesid = <smithID>;
+delete from staff
+	where staffid = <smithID>;
+
+select staffid, sname,
+	datediff (year, hiredate, getdate()) "years with company"
+		from staff
+order by 3 desc;
+
+select * 
+	from orders
+		where ordid = 604;
+delete from items
+	where ordid = 604;
+delete from orders 
+	where ordid = 604;
+
+select * 
+	from products
+		where description like '%golf%';
+
+select sname "hired in 2014"
+	from staff
+		where year (hiredate) = '2014';
+
+select sname "no job at present"
+	from staff
+		where jobtitle is null;
+
+select cname, cstate 
+	from customers
+		where cstate not in ('az', 'ca')
+order by 2;

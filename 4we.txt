@@ -1,0 +1,195 @@
+/* Q1: For all activities, retrieve the descriptions (popular activities in june 2019), the 
+activity types that the guests participated in during June 2019 and the number of people 
+participating in every activity (number_of_participants). Place the people participating in 
+every activity on a separate line. Do not include duplicate listings. Store the results in 
+june_activities. Display your results alphabetically by type. */
+
+create view june_activities as
+	select description "popular activities in june 2019", type,
+			numberinparty "number_of_participants"
+		from activities a join reservations r
+				on a.aid = r.aid
+			where year (rdate) = '2019'
+				and month (rdate) = '06';
+
+select *
+	from june_activities
+order by 2;
+
+
+/* Q2: Write a transaction script to store the following data: New guests, Trudy and Martin
+Winters from Mankato Minnesota will be staying at the resort this fall. They can be reached at
+218-555-5872. They have 2 children; Trevor, who was 6 on June 2, 2016 and Brooke, who turned 9
+on Jan 15, 2016. Store Trevor first. They have not yet decided if they want to participate in
+any activities. The resort will assign them guest number G24 and place them in condo 5 A105. The
+Winters' will arrive for the week starting October 31st, 2020. (see data in the table as to how
+it has been entered - use caps where indicated) After the data has been stored in each table, 
+retrieve those new records in each table to ensure the data was entered correctly. hint: order
+matters when inserting the data into the tables. */
+
+begin transaction;
+
+insert into guests
+	values ('G24', 'Trudy', 'Winters', 'Mankato', 'MN', '218-555-5872', 'Martin');
+
+insert into families
+	values ('G24', 'Trevor', 'son', '2010-06-02'), 
+		('G24', 'Brooke', 'daughter', '2007-01-15');
+
+insert into condostays
+	values (5, 'G24', '2020-10-31', '2020-11-07');
+
+select *
+	from guests
+		where guest# = 'G24';
+
+select * 
+	from families
+		where guest# = 'G24';
+
+select *
+	from condostays
+		where guest# = 'G24';
+
+rollback;
+commit;
+
+
+/* Q3: Trigger: assignhousekeeping	When a new condo is added to the database, automatically add
+a new record to the cleaning table. The new condo will be cleaned by Janice Avery the day it is 
+added to the condo table; use today's date as the DateCleaned. Show screenshots of your trigger
+code along with screenshots of the record has been correctly added to the cleaning table and the
+record has been correctly added to the condos table. Use the insert statement to test your 
+trigger. Insert into condos values (99, 'Z', '101', 1030, 2, 1, 999.00); */
+
+create trigger assignhousekeeping
+	on condos
+		after insert
+as 
+	insert into cleaning
+		values (
+			(select condo# 
+				from inserted),
+			(getdate()),
+			(select pid
+				from personnel
+					where lname = 'Avery' 
+						and fname = 'Janice'));
+
+insert into condos
+	values (99, 'Z', '101', 1030, 2, 1, 999.00);
+
+select *
+	from cleaning
+		where condo# = 99;
+
+select * 
+	from condos
+		where condo# = 99;
+
+
+/* Q4: Procedures to - CalculateMcLeanFinalInvoice
+The McLean family is challenging their total bill. Retrieve all invoice data (including details)
+for the McLean family for 2019, invoice 20065 (see data required on EERD). Use a sales tax of 8%
+when calculating the total billed. 
+Hint: create a series of procedures to create base tables to
+store the intermediate calculations: calculate and store the McLean activity totals, then 
+calculate and store the McClean details totals, then calculate and store the McClean condo fees,
+then calculate and store the McClean total fees, finally calculate and display the McLean total 
+billed. 
+You will have 4 new tables in your database (the data stored above) and a final result 
+(not stored, but easily retrieved by executing your procedure). Code separate procedures to 
+create each table and populate it with the correct values. Use all coding protocols as discussed
+in this course. Do not hardcode; start with what you know. All of your tables will be created and 
+stored in the database as part of your procedures. */
+
+create procedure McLeanActTotals as
+	begin
+		create table McLeanActivityTotals (
+			rlname	varchar(20),
+			guest#	varchar(4),
+			inv#	char(5),
+			rdate	date,
+			rid		char(5),
+			aid		varchar(3),
+			numberinparty	tinyint,
+			personprice		decimal(4,2),
+			activitytotal	decimal(5,2));
+
+		insert into McLeanActivityTotals 
+			select rlname, g.guest#, inv#, rdate, r.rid, r.aid, numberinparty, 
+				ppp "PersonPrice", ppp * numberinparty "ActivityTotal"
+					from guests g join reservations r
+								on g.guest# = r.guest#
+							join activities a
+								on r.aid = a.aid
+							join invoicedetails id
+								on id.rid = r.rid
+						where year (rdate) = '2019'
+							and inv# = '20065';
+	end
+
+create procedure McLeanDetTotals as
+	begin
+		create table McLeanDetailsTotals (
+			guest#		varchar(4),
+			inv#		char(5),
+			detailstotal decimal(5,2));
+
+		insert into McLeanDetailsTotals 
+			select guest#, inv#, sum(ActivityTotal)
+				from McLeanActivityTotals
+					group by guest#, inv#;
+	end
+
+create procedure McLeanCondoTotals as
+	begin
+		create table McLeanCondoFees (
+			inv#			char(5),
+			condo#			smallint,
+			guest#			varchar(4),
+			rlname			varchar(20),
+			arrivaldate		date,
+			departuredate	date,
+			condofee		decimal (6,2));
+
+		insert into McLeanCondoFees
+			select distinct ma.inv#, c.condo#, cs.guest#, ma.rlname, startdate, enddate, 
+					weeklyfee * (datediff (week, startdate, enddate)) "condofee"
+				from condos c join condostays cs
+							on c.condo# = cs.condo#
+						join mcleanactivitytotals ma
+							on ma.guest# = cs.guest#
+					where year (startdate) = '2019';
+	end
+
+create procedure McLeanTotal as
+	begin
+		create table McLeanTotalFees (
+			inv#	char(5),
+			guest#	varchar(4),
+			totalfees	decimal(6,2));
+
+		insert into mcleantotalfees
+			select md.inv#, md.guest#, detailstotal + condofee "totalfees"
+				from mcleandetailstotals md join mcleancondofees mc
+					on md.inv# = mc.inv#
+	end
+
+create procedure McLeanFinalTotal as
+	begin
+		exec mcleanacttotals
+		exec mcleandettotals 
+		exec mcleancondototals 
+		exec mcleantotal
+		select distinct md.inv#, condo#, md.guest#, ma.rlname, arrivaldate, departuredate, condofee, detailstotal, totalfees, 
+				totalfees * 0.08 "salestax", totalfees * 1.08 "totalbilled"
+			from mcleanactivitytotals ma join mcleandetailstotals md
+					on ma.inv# = md.inv#
+				join mcleancondofees mc
+					on md.inv# = mc.inv#
+				join mcleantotalfees mt
+					on mc.inv# = mt.inv#
+	end
+
+exec mcleanfinaltotal;
